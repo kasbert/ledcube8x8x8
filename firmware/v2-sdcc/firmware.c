@@ -8,7 +8,6 @@
 __xdata volatile uchar display[2][8][8]; // 8x8x8 = (Z,Y,X)
 volatile uchar frame = 0;   // current visible frame (frontbuffer) index
 volatile uchar temp =  1;   // not visible frame (backbuffer) index
-volatile uchar layer = 0;   // layer, that is being re-painted
 
 #define MAX_BUFFER  128     // UART ring buffer size
 //#define TX_ENABLED        // uncomment to enable uart TX function
@@ -316,7 +315,7 @@ void main()
     ES = 1;  // enable UART interrupt
     
     // setup timer0
-    TH0 = 0xc0;     // reload value
+    TH0 = 0x40;     // reload value
     TL0 = 0;
     TR0 = 1;        // timer0 start
     
@@ -373,22 +372,18 @@ void main()
 
 void print() __interrupt (1) // timer0 interrupt
 {
-    uchar y;
-    P1 = 0;
-    
-    // update one layer at a time
-    for (y=0; y<8; y++) 
-    {
-        P2 = 1<<y;
-        delay(3);
-        P0 = display[frame][layer][y]; // shift every layer byte
-        delay(3);
-    }
-    
-    P1 = 1<<layer;
-    layer = (layer+1)%8; // rewind - ensure we loop in 0-7 layers
-    
+    static volatile uchar y=0, z=0;
+
+    P0 = 0;
+    P2 = 1 << y;
+    P1 = 1 << z;
+    P0 = display[frame][z][y];
+
+    // use more complex pattern to avoid ghost images
+    y = (y + 3) & 7;
+    z = (z + 3 + (y==0)) & 7;
+
     // reset timer0
-    TH0 = 0xc0;
+    TH0 = 0xf8;
     TL0 = 0;
 }
